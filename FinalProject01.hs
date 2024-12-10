@@ -16,6 +16,7 @@ bottomUp cfg input =
 -- IMPORTANT: Please do not change anything above here.
 --            Write all your code below this line.
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 -- These functions are placeholders to work with 'bottomUp' in Part 1.3. 
 -- You should replace 'undefined' in these functions with your own code.
@@ -63,10 +64,9 @@ shift rules (stack, input) = case input of
     _ -> []
 
 reduce :: (Eq nt, Eq t) => [RewriteRule nt t] -> Config nt t -> [ParseStep nt t]
-reduce rules (stack, input) = case stack of
-  [] -> []
-  (NoBar nt : stack') -> case find (\rule -> case rule of { NTRule nt' _ -> nt' == nt; _ -> False }) rules of
-    Just (NTRule nt' [t1, t2]) -> [ParseStep Reduce (NTRule nt' [t1, t2]) (Bar nt' : stack', input)]
+reduce rules (NoBar nt1 : NoBar nt2 : rest, input) =
+  case find (\rule -> case rule of { NTRule _ [nt1', nt2'] -> nt1 == nt1' && nt2 == nt2'; _ -> False }) rules of
+    Just (NTRule nt' _) -> [ParseStep Reduce (NTRule nt' [nt1, nt2]) (NoBar nt' : rest, input)]
     _ -> []
     
 -- Now onto the fun part. Your bottom-up parser will be split across two functions: parser and
@@ -80,6 +80,11 @@ reduce rules (stack, input) = case stack of
 -- [RewriteRule nt t] -> Config nt t -> Config nt t ->
 -- [[ParseStep nt t]]
 
+-- that can be used together with bottomUp. This function should take the list of transition steps, the
+-- list of rules, the starting configuration, and the goal configuration given in bottomUp, and it should
+-- return a list of all of the successful parses that are possible by executing the given transition steps
+-- according to the given rules (a list of lists of ParseSteps).
+
 -- When you put the two pieces together, bottomUp will take two arguments, a CFG and a list of
 -- terminal symbols, and it will return all of the possible bottom-up parses of the given list of terminal
 -- symbols under the given CFG. If the list of terminal symbols cannot be parsed by the given CFG,
@@ -92,11 +97,9 @@ parser :: (Eq nt, Eq t)
        -> Config nt t         -- Starting configuration.
        -> Config nt t         -- Goal configuration.
        -> [[ParseStep nt t]]  -- List of possible parses.
-parser transitions rules start goal = case transitions of 
+parser transitions rules start goal = case transitions of
   [] -> []
   (t:ts) -> case t rules start of
     [] -> parser ts rules start goal
     (x:xs) -> case x of
-      ParseStep _ _ (_, []) -> [x] : parser ts rules start goal
-      ParseStep _ _ newConfig -> let next = parser transitions rules newConfig goal in
-        map (\y -> x : y) next ++ parser ts rules start goal
+      ParseStep _ _ config -> if config == goal then [x] : parser ts rules start goal else parser ts rules start goal
